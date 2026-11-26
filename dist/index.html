@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Monte uma programação linear e acompanhe cada decisão do método Simplex em duas fases.">
+  <meta name="theme-color" content="#f8f5ff">
+  <title>Simplex Visual · Pesquisa Operacional</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script defer src="assets/simplex.js"></script>
+  <script defer src="assets/plot.js"></script>
+  <script defer src="assets/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#laboratorio">Pular para o laboratório</a>
+  <header class="site-header">
+    <div class="wrap topbar">
+      <a href="#" class="brand" aria-label="Simplex Visual, início">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span>Simplex <strong>Visual</strong></span>
+      </a>
+      <nav aria-label="Navegação principal">
+        <a href="#laboratorio">Laboratório</a>
+        <a href="#guia">Guia de PO</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero-copy">
+        <p class="eyebrow">Pesquisa Operacional · DCC035</p>
+        <h1 id="page-title">Método <em>Simplex</em></h1>
+        <p>Monte uma programação linear e acompanhe, passo a passo, como o Simplex escolhe a base e resolve o problema.</p>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="orbit orbit-a"></div><div class="orbit orbit-b"></div>
+        <div class="art-glass"></div>
+        <div class="art-board">
+          <i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i>
+        </div>
+        <div class="art-spark spark-a"></div><div class="art-spark spark-b"></div>
+      </div>
+    </section>
+
+    <div id="laboratorio" class="workspace">
+      <section class="panel editor" aria-labelledby="editor-title">
+        <div class="panel-title">
+          <h2 id="editor-title">Monte sua PL</h2>
+          <button id="import-button" type="button" class="button secondary compact">Abrir .txt</button>
+          <input type="file" id="import-file" accept=".txt,text/plain" hidden>
+        </div>
+        <p class="editor-description">Escolha um exemplo, edite a grade ou digite a PL.</p>
+        <div class="example-field">
+          <label for="examples">Exemplos</label>
+          <select id="examples">
+            <option value="duas-fases">Duas fases</option>
+            <option value="unico">Ótimo único · teste2.txt</option>
+            <option value="inviavel">Inviável</option>
+            <option value="ilimitado">Ilimitado · teste.txt</option>
+            <option value="multiplos">Múltiplos ótimos</option>
+            <option value="sinais">Variáveis com sinais e b negativo</option>
+            <option value="personalizado" hidden>Entrada personalizada</option>
+          </select>
+        </div>
+
+        <form id="problem-form" novalidate>
+          <div class="entry-modes" role="group" aria-label="Modo de entrada da PL">
+            <button id="grid-mode" type="button" aria-controls="grid-input" aria-pressed="true">Grade</button>
+            <button id="text-mode" type="button" aria-controls="text-input" aria-pressed="false">Bloco de notas</button>
+          </div>
+          <div id="grid-input">
+            <div class="dimensions">
+              <label for="num-variables">Variáveis <input id="num-variables" type="number" min="1" step="1" value="2" inputmode="numeric"></label>
+              <label for="num-constraints">Restrições <input id="num-constraints" type="number" min="0" step="1" value="3" inputmode="numeric"></label>
+            </div>
+            <h3>Função objetivo e domínios</h3>
+            <div id="objective" class="scroll"></div>
+            <h3>Restrições</h3>
+            <div id="constraints" class="scroll"></div>
+          </div>
+          <div id="text-input" class="text-input" hidden>
+            <label for="pl-text">PL no formato do TP</label>
+            <textarea id="pl-text" rows="7" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="text-format"></textarea>
+            <p id="text-format" class="field-help">Use as quatro primeiras linhas para quantidade de variáveis, quantidade de restrições, domínios e custos. Depois, escreva uma restrição por linha.</p>
+          </div>
+
+          <details class="original" open>
+            <summary>PL em notação matemática</summary>
+            <div id="original-content" class="formula-lines" aria-live="polite"></div>
+          </details>
+
+          <div class="policy-field">
+            <label for="policy">Regra de entrada na base</label>
+            <select id="policy" aria-describedby="policy-note">
+              <option value="largest">largest · maior ganho por unidade</option>
+              <option value="bland">bland · menor índice</option>
+              <option value="smallest">smallest · menor ganho positivo</option>
+            </select>
+            <p id="policy-note" class="field-help"></p>
+          </div>
+          <p id="input-feedback" class="input-feedback" role="status" hidden></p>
+          <div class="editor-actions">
+            <button type="submit" class="button primary">Resolver passo a passo</button>
+            <button id="export-button" type="button" class="button secondary">Baixar .txt</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel resolution" id="resolucao" tabindex="-1" aria-labelledby="resolution-title">
+        <div class="panel-title">
+          <h2 id="resolution-title">Resolução</h2>
+          <button id="finish-button" type="button" class="button secondary compact">Ir ao resultado</button>
+        </div>
+        <p id="stale" class="input-feedback" role="status" hidden>A entrada foi editada. Clique em Resolver passo a passo para atualizar.</p>
+        <ol id="phases" class="phase-list" aria-label="Fases da resolução"></ol>
+
+        <div class="step-controls" aria-label="Controles das etapas">
+          <button id="previous-button" class="button quiet compact" type="button">Anterior</button>
+          <span id="counter" role="status" class="counter"></span>
+          <button id="next-button" class="button primary compact" type="button">Próximo passo</button>
+        </div>
+
+        <div class="view-controls" role="group" aria-label="Visualização da resolução">
+          <button id="step-view-button" class="view-button" type="button" aria-pressed="true">Tableau e etapas</button>
+          <button id="graph-view-button" class="view-button" type="button" aria-pressed="false">Gráfico</button>
+        </div>
+
+        <div id="step-panel">
+          <div id="step-content" aria-live="polite"></div>
+        </div>
+        <div id="graph-panel" hidden>
+          <p id="graph-description" class="step-text"></p>
+          <canvas id="graph" role="img" aria-label="Gráfico da região viável no plano de x0 e x1"></canvas>
+          <div id="graph-legend" class="graph-legend"></div>
+          <p class="field-help">A área lilás representa o poliedro convexo (região viável) no recorte exibido. A linha tracejada rosa é a curva de nível cᵀx = z e a seta rosa aponta o sentido de crescimento da função objetivo.</p>
+        </div>
+        <p id="run-error" class="input-feedback" role="alert" hidden></p>
+
+        <details class="history">
+          <summary>Histórico desta resolução</summary>
+          <ol id="history-list"></ol>
+        </details>
+      </section>
+    </div>
+
+    <section class="study" id="guia" aria-labelledby="study-title">
+      <div class="study-title">
+        <h2 id="study-title">Guia de Pesquisa Operacional</h2>
+        <p>Conceitos essenciais da primeira parte de DCC035 cobertos no Trabalho Prático — do modelo ao Simplex em Duas Fases e Dualidade.</p>
+      </div>
+      <div class="study-grid">
+        <details open>
+          <summary>1. Programação Linear e Região Viável</summary>
+          <p>Uma <b>Programação Linear (PL)</b> maximiza ou minimiza uma <b>função objetivo linear</b> <code>cᵀx</code> sujeita a restrições lineares (<code>≤</code>, <code>≥</code> ou <code>=</code>). A interseção desses semi-espaços forma um <b>poliedro convexo</b> — a região viável.</p>
+          <p>Pelo <b>Teorema Fundamental da PL</b>, se existe solução ótima, pelo menos um <b>ponto extremo (vértice)</b> do poliedro é ótimo. O Simplex explora exatamente esses vértices.</p>
+        </details>
+
+        <details open>
+          <summary>2. Forma Padrão de Igualdades (FPI)</summary>
+          <p>Para aplicar o Simplex, convertemos qualquer PL para <code>max cᵀx</code> sujeito a <code>Ax = b</code> e <code>x ≥ 0</code>:</p>
+          <ul>
+            <li><b>Restrição ≤</b>: somamos uma variável de folga <code>+ sᵢ ≥ 0</code>.</li>
+            <li><b>Restrição ≥</b>: subtraímos uma variável de excesso <code>− sᵢ ≥ 0</code>.</li>
+            <li><b>Variável livre</b>: substituímos <code>xⱼ = xⱼ⁺ − xⱼ⁻</code> com <code>xⱼ⁺, xⱼ⁻ ≥ 0</code>.</li>
+            <li><b>Variável ≤ 0</b>: substituímos <code>xⱼ = −xⱼ⁻</code> com <code>xⱼ⁻ ≥ 0</code>.</li>
+            <li><b>Lado direito b &lt; 0</b>: multiplicamos toda a linha por <code>−1</code> para manter <code>b ≥ 0</code>.</li>
+          </ul>
+        </details>
+
+        <details>
+          <summary>3. Base, Solução Básica e Degeneração</summary>
+          <p>Uma <b>base</b> é um conjunto de <code>m</code> colunas linearmente independentes de <code>A</code> que aparecem como matriz identidade no tableau. Fixando as variáveis <b>não básicas em 0</b>, lemos o valor das <b>básicas</b> diretamente na coluna <code>b</code>.</p>
+          <p>Se <code>b ≥ 0</code>, a solução básica é <b>viável</b>. Quando alguma variável básica vale <code>0</code>, dizemos que a solução é <b>degenerada</b> (o pivô pode trocar a base sem alterar o ponto <code>x</code> nem <code>z</code>).</p>
+        </details>
+
+        <details>
+          <summary>4. Leitura do Tableau, Pivô e Regra de Bland</summary>
+          <p>A linha <b>L0</b> guarda <code>−c̄</code> (sinal invertido). Logo, uma não básica com valor <b>negativo em L0</b> tem custo reduzido positivo e melhora <code>z</code> ao entrar na base:</p>
+          <ul>
+            <li><b>Escolha da entrada</b>: <code>largest</code> (mais negativo em L0), <code>smallest</code> (negativo mais próximo de 0) ou <code>bland</code> (menor índice — evita ciclagem em casos degenerados).</li>
+            <li><b>Teste da razão (saída)</b>: dividimos <code>bᵢ / aᵢⱼ</code> apenas onde <code>aᵢⱼ &gt; 0</code>. A menor razão indica qual básica zera primeiro.</li>
+            <li><b>Pivoteamento</b>: eliminação de Gauss-Jordan faz o pivô virar <code>1</code> e o resto da coluna virar <code>0</code>.</li>
+          </ul>
+        </details>
+
+        <details>
+          <summary>5. Simplex em Duas Fases (PL Auxiliar)</summary>
+          <p>Quando a FPI já possui <code>m</code> colunas formando uma identidade (por exemplo, todas as restrições são <code>≤</code> com <code>b ≥ 0</code>), pulamos a Fase I.</p>
+          <p>Caso contrário, criamos variáveis artificiais <code>aᵢ ≥ 0</code> e resolvemos a <b>PL auxiliar</b>: <code>max −∑ aᵢ</code>. Se o ótimo auxiliar for <code>0</code>, obtemos uma base viável para a Fase II (retirando artificiais ou linhas redundantes <code>0 = 0</code>). Se for <code>&lt; 0</code>, a PL original é <b>inviável</b>.</p>
+        </details>
+
+        <details>
+          <summary>6. Resultados Possíveis e Certificados</summary>
+          <ul>
+            <li><b>Ótimo único</b>: toda não básica tem valor <code>≥ 0</code> em L0 e nenhuma direção de custo zero altera <code>x</code>.</li>
+            <li><b>Múltiplos ótimos</b>: no ótimo, uma não básica tem valor <code>0</code> em L0 e permite mover para outro ponto <code>u</code> com mesmo <code>z</code>. Todo o segmento <code>λx + (1−λ)u</code> é ótimo.</li>
+            <li><b>Ilimitado</b>: uma coluna com L0 <code>&lt; 0</code> tem todos os coeficientes <code>≤ 0</code>. A direção <code>d</code> (com <code>cᵀd &gt; 0</code>) certifica que <code>x + t·d</code> cresce sem limite.</li>
+            <li><b>Inviável</b>: o ótimo auxiliar <code>&lt; 0</code> fornece o certificado <code>y</code> tal que <code>yᵀA ≥ 0</code> e <code>yᵀb &lt; 0</code>.</li>
+          </ul>
+        </details>
+
+        <details>
+          <summary>7. Dualidade, Teorema Forte e VERO</summary>
+          <p>Cada restrição da primal gera uma variável dual <code>wᵢ</code> (preço-sombra). O algoritmo registra todas as operações elementares sobre as linhas originais (como no tableau estendido <b>VERO™</b> das notas de aula), recuperando <code>wᵀ = c_Bᵀ A_B⁻¹</code> automaticamente.</p>
+          <p>Pelo <b>Teorema Forte da Dualidade</b>, no ótimo vale <code>cᵀx = bᵀw</code>. Pelas <b>Folgas Complementares</b>, se uma restrição primal tem folga <code>&gt; 0</code> no ótimo, sua variável dual correspondente é <code>0</code>.</p>
+        </details>
+
+        <details>
+          <summary>8. Formato de Entrada e Uso no Terminal (TP)</summary>
+          <p>O arquivo <code>.txt</code> tem 4 linhas de cabeçalho: número de variáveis <code>n</code>, número de restrições <code>m</code>, domínios (<code>1</code> para ≥ 0, <code>-1</code> para ≤ 0, <code>0</code> para livre) e custos <code>c</code> (com ou sem <code>max</code>), seguidos de <code>m</code> restrições.</p>
+          <p>No terminal, execute: <code>node meusimplex.js exemplos/teste2.txt --decimals 3 --digits 7 --policy bland</code>. A indexação começa em <code>x0</code> e a saída final segue exatamente o formato exigido pelo TP.</p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer"><div class="wrap">Simplex Visual · Pesquisa Operacional</div></footer>
+</body>
+</html>
